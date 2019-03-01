@@ -16,22 +16,18 @@
 
 package uk.gov.hmrc.cbcr.services
 
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.{times, verify, when, _}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mock.MockitoSugar
 import org.scalatestplus.play.OneAppPerSuite
 import play.api.Configuration
+import reactivemongo.api.commands.DefaultWriteResult
+import uk.gov.hmrc.cbcr.config.DocRefIdConfig
 import uk.gov.hmrc.cbcr.controllers.MockAuth
 import uk.gov.hmrc.cbcr.repositories.{DocRefIdRepository, ReportingEntityDataRepo}
-import uk.gov.hmrc.play.test.UnitSpec
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.{times, verify, when}
-import org.scalatest.BeforeAndAfterEach
-import reactivemongo.api.commands.DefaultWriteResult
-import org.mockito.Mockito._
-import uk.gov.hmrc.AuditConnector
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
 import uk.gov.hmrc.play.audit.http.connector.{AuditConnector, AuditResult}
-
+import uk.gov.hmrc.play.test.UnitSpec
 import scala.concurrent.{ExecutionContext, Future}
 
 class DocRefIdClearServiceSpec extends UnitSpec with MockitoSugar with MockAuth with OneAppPerSuite with Eventually{
@@ -39,20 +35,19 @@ class DocRefIdClearServiceSpec extends UnitSpec with MockitoSugar with MockAuth 
   val config                  = app.injector.instanceOf[Configuration]
   implicit val ec             = app.injector.instanceOf[ExecutionContext]
 
-  val runMode                 = mock[RunMode]
   val docRefIdRepo            = mock[DocRefIdRepository]
   val reportingEntityDataRepo = mock[ReportingEntityDataRepo]
-  val mockAudit               = mock[AuditConnectorI]
+  val mockAudit               = mock[AuditConnector]
 
-  val testConfig              = Configuration("Dev.DocRefId.clear" -> "docRefId1_docRefId2_docRefId3_docRefId4")
+  val testConfig              = DocRefIdConfig("docRefId1_docRefId2_docRefId3_docRefId4")
   val writeResult             = DefaultWriteResult(true,1,Seq.empty,None,None,None)
   val notFoundWriteResult     = DefaultWriteResult(true,0,Seq.empty,None,None,None)
 
-  when(runMode.env) thenReturn "Dev"
+
   when(docRefIdRepo.delete(any())) thenReturn Future.successful(writeResult)
   when(reportingEntityDataRepo.delete(any())) thenReturn Future.successful(writeResult)
 
-  new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo,config ++ testConfig,runMode, mockAudit)
+  new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo, mockAudit, testConfig)
 
   "If there are docRefIds in the $RUNMODE.DocRefId.clear field then, for each '_' separated docrefid, it" should {
     "call delete to the DocRefIdRepo" in {
@@ -75,7 +70,7 @@ class DocRefIdClearServiceSpec extends UnitSpec with MockitoSugar with MockAuth 
       when(reportingEntityDataRepo.delete(any())) thenReturn Future.successful(notFoundWriteResult)
       when(mockAudit.sendExtendedEvent(any())(any(),any())) thenReturn Future.successful(AuditResult.Success)
 
-      new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo,config ++ testConfig,runMode, mockAudit)
+      new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo, mockAudit, testConfig)
       eventually { verify(reportingEntityDataRepo, times(4)).delete(any()) }
       eventually { verify(mockAudit, times(4)).sendExtendedEvent(any())(any(),any()) }
     }
@@ -85,7 +80,7 @@ class DocRefIdClearServiceSpec extends UnitSpec with MockitoSugar with MockAuth 
       when(reportingEntityDataRepo.delete(any())) thenReturn Future.successful(notFoundWriteResult)
       when(mockAudit.sendExtendedEvent(any())(any(),any())) thenReturn Future.successful(AuditResult.Failure("Audit Failure", None))
 
-      new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo,config ++ testConfig,runMode, mockAudit)
+      new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo, mockAudit, testConfig)
       eventually { verify(reportingEntityDataRepo, times(4)).delete(any()) }
       eventually { verify(mockAudit, times(4)).sendExtendedEvent(any())(any(),any()) }
     }
@@ -95,7 +90,7 @@ class DocRefIdClearServiceSpec extends UnitSpec with MockitoSugar with MockAuth 
       when(reportingEntityDataRepo.delete(any())) thenReturn Future.successful(notFoundWriteResult)
       when(mockAudit.sendExtendedEvent(any())(any(),any())) thenReturn Future.successful(AuditResult.Disabled)
 
-      new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo,config ++ testConfig,runMode, mockAudit)
+      new DocRefIdClearService(docRefIdRepo,reportingEntityDataRepo, mockAudit, testConfig)
       eventually { verify(reportingEntityDataRepo, times(4)).delete(any()) }
       eventually { verify(mockAudit, times(4)).sendExtendedEvent(any())(any(),any()) }
     }

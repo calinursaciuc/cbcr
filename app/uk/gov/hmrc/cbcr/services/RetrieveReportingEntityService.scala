@@ -17,28 +17,27 @@
 package uk.gov.hmrc.cbcr.services
 
 import javax.inject.Inject
+import play.api.Logger
 import play.api.libs.json.Json
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
+import uk.gov.hmrc.cbcr.config.RetrieveConfig
 import uk.gov.hmrc.cbcr.repositories.ReportingEntityDataRepo
-import play.api.{Configuration, Logger}
-import uk.gov.hmrc.cbcr.models.DocRefId
+import uk.gov.hmrc.play.audit.http.connector.AuditConnector
+import scala.concurrent.ExecutionContext
 
-import scala.concurrent.{ExecutionContext, Future}
+class RetrieveReportingEntityService @Inject()(repo: ReportingEntityDataRepo,
+                                               audit: AuditConnector,
+                                               retrieveConfig: RetrieveConfig
+                                              )(implicit ex: ExecutionContext) {
 
-class RetrieveReportingEntityService @Inject() (repo:ReportingEntityDataRepo,
-                                                configuration:Configuration,
-                                                runMode: RunMode,
-                                                audit: AuditConnectorI) (implicit ex: ExecutionContext) {
-
-  val retrieveReportingEntity: Boolean = configuration.getBoolean(s"${runMode.env}.retrieve.ReportingEntity").getOrElse(false)
+  val retrieveReportingEntity: Boolean = retrieveConfig.reportingEntity
   Logger.info(s"retrieveReportingEntity set to: $retrieveReportingEntity")
 
   if (retrieveReportingEntity) {
-    val docRefId: String = configuration.getString(s"${runMode.env}.retrieve.docRefId").getOrElse("")
+    val docRefId: String = retrieveConfig.docRefId
     Logger.info(s"docRefId to retireve = ${docRefId}")
 
     repo.query(docRefId).map(red =>
-      if(red.size > 0) red.foreach(r => Logger.info(s"reportingEntityData for docRefId ${docRefId} = ${Json.toJson(r)}"))
+      if (red.size > 0) red.foreach(r => Logger.info(s"reportingEntityData for docRefId ${docRefId} = ${Json.toJson(r)}"))
       else Logger.info(s"no reportingEntityData found for docRefIds matching $docRefId")
     )
   }

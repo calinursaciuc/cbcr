@@ -16,143 +16,106 @@
 
 package uk.gov.hmrc.cbcr.connectors
 
-import javax.inject.{Inject, Singleton}
-import com.google.inject.ImplementedBy
-import com.typesafe.config.Config
-import play.api.{Configuration, Logger}
+import javax.inject.Inject
+import play.api.Logger
 import play.api.libs.json.{JsObject, JsValue, Json}
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
-import uk.gov.hmrc.cbcr.models.{ContactDetails, CorrespondenceDetails, MigrationRequest, SubscriptionRequest}
+import uk.gov.hmrc.cbcr.config.DesConfig
+import uk.gov.hmrc.cbcr.models.{CorrespondenceDetails, MigrationRequest, SubscriptionRequest}
+import uk.gov.hmrc.http._
+import uk.gov.hmrc.http.logging.Authorization
+import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 import uk.gov.hmrc.play.audit.model.Audit
-import uk.gov.hmrc.play.config.ServicesConfig
-import uk.gov.hmrc.play.http.ws.{WSGet, WSHttp, WSPost, WSPut}
-import uk.gov.hmrc.play.http._
+import uk.gov.hmrc.play.bootstrap.http.HttpClient
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-import uk.gov.hmrc.http.{HeaderCarrier, HttpException, HttpGet, HttpPost, HttpPut, HttpResponse}
-import uk.gov.hmrc.http.hooks.HttpHook
-import uk.gov.hmrc.http.logging.Authorization
-import configs.syntax._
-import uk.gov.hmrc.cbcr.config.GenericAppConfig
-import uk.gov.hmrc.cbcr.services.RunMode
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
-import scala.concurrent.duration.Duration
+class DESConnector @Inject()(val ec: ExecutionContext,
+                             val auditConnector: AuditConnector,
+                             val http: HttpClient,
+                             val desConfig: DesConfig) extends RawResponseReads {
+  //with RawResponseReads {
 
+  lazy val serviceUrl: String = desConfig.serviceUrl
+  lazy val orgLookupURI: String = "registration/organisation"
+  lazy val cbcSubscribeURI: String = "country-by-country/subscription"
+  lazy val urlHeaderEnvironment: String = desConfig.urlHeaderEnvironment
+  lazy val urlHeaderAuthorization: String = desConfig.authorisationToken
 
-  @ImplementedBy(classOf[DESConnectorImpl])
-  trait DESConnector extends ServicesConfig with RawResponseReads {
+  val audit = new Audit("known-fact-checking", auditConnector)
 
-    implicit val ec:ExecutionContext
-    implicit val configuration:Configuration
-    implicit val runMode:RunMode
+  val lookupData: JsObject = Json.obj(
+    "regime" -> "ITSA",
+    "requiresNameMatch" -> false,
+    "isAnAgent" -> false
+  )
 
-    def serviceUrl: String
+  val stubMigration: Boolean = desConfig.stubMigration
 
-    def orgLookupURI: String
+  val delayMigration: Int = 1000 * desConfig.delayMigration
 
-    def cbcSubscribeURI: String
+  private def createHeaderCarrier: HeaderCarrier =
+    HeaderCarrier(extraHeaders = Seq("Environment" -> urlHeaderEnvironment), authorization = Some(Authorization(urlHeaderAuthorization)))
 
-    def urlHeaderEnvironment: String
-
-    def urlHeaderAuthorization: String
-
-    def http: HttpPost with HttpGet with HttpPut
-
-    val audit:Audit
-
-    val lookupData: JsObject = Json.obj(
-      "regime" -> "ITSA",
-      "requiresNameMatch" -> false,
-      "isAnAgent" -> false
-    )
-
-    val stubMigration: Boolean = configuration.underlying.get[Boolean](s"${runMode.env}.CBCId.stubMigration").valueOr(_ => false)
-
-    val delayMigration: Int = 1000 * configuration.underlying.get[Int](s"${runMode.env}.CBCId.delayMigration").valueOr(_ => 60)
-
-
-    private def createHeaderCarrier: HeaderCarrier =
-      HeaderCarrier(extraHeaders = Seq("Environment" -> urlHeaderEnvironment), authorization = Some(Authorization(urlHeaderAuthorization)))
-
-    def lookup(utr: String): Future[HttpResponse] = {
-      implicit val hc: HeaderCarrier = createHeaderCarrier
-      Logger.info(s"Lookup Request sent to DES: POST $serviceUrl/$orgLookupURI/utr/$utr")
-      http.POST[JsValue, HttpResponse](s"$serviceUrl/$orgLookupURI/utr/$utr", Json.toJson(lookupData)).recover{
-        case e:HttpException => HttpResponse(e.responseCode,responseString = Some(e.message))
-      }
-    }
-
-    def createSubscription(sub:SubscriptionRequest): Future[HttpResponse] = {
-      implicit val hc: HeaderCarrier = createHeaderCarrier
-      implicit val writes = SubscriptionRequest.subscriptionWriter
-      Logger.info(s"Create Request sent to DES: ${Json.toJson(sub)} for safeID: ${sub.safeId}")
-      http.POST[SubscriptionRequest, HttpResponse](s"$serviceUrl/$cbcSubscribeURI", sub).recover{
-        case e:HttpException => HttpResponse(e.responseCode,responseString = Some(e.message))
-      }
-    }
-
-    def createMigration(mig:MigrationRequest) : Future[HttpResponse] = {
-      implicit val hc: HeaderCarrier = createHeaderCarrier
-      implicit val writes = MigrationRequest.migrationWriter
-      Logger.info(s"Migration Request sent to DES for safeId: ${mig.safeId} and CBCId: ${mig.cBCId}")
-
-      Logger.warn(s"stubMigration set to: $stubMigration")
-      val res = Promise[HttpResponse]()
-      Future {
-        if (!stubMigration) {
-          Logger.info("calling ETMP for migration")
-          Thread.sleep(delayMigration)
-          http.POST[MigrationRequest, HttpResponse](s"$serviceUrl/$cbcSubscribeURI", mig).recover {
-            case e: HttpException => HttpResponse(e.responseCode, responseString = Some(e.message))
-          }.map(r => {
-            Logger.info(s"Migration Status for safeId: ${mig.safeId} and cBCId: ${mig.cBCId} ${r.status}")
-            res.success(r)
-          })
-        } else {
-          Logger.info("in migration stub")
-
-          Thread.sleep(delayMigration)
-          res.success(HttpResponse(200, responseString = Some(s"migrated ${mig.cBCId}")))
-        }
-      }
-      res.future
-    }
-
-    def updateSubscription(safeId:String,cor:CorrespondenceDetails) : Future[HttpResponse] = {
-      implicit val hc: HeaderCarrier = createHeaderCarrier
-      implicit val format = CorrespondenceDetails.updateWriter
-      Logger.info(s"Update Request sent to DES: $cor for safeID: $safeId")
-      http.PUT[CorrespondenceDetails, HttpResponse](s"$serviceUrl/$cbcSubscribeURI/$safeId", cor).recover{
-        case e:HttpException => HttpResponse(e.responseCode,responseString = Some(e.message))
-      }
-    }
-
-    def getSubscription(safeId:String):Future[HttpResponse] = {
-      implicit val hc: HeaderCarrier = createHeaderCarrier
-      Logger.info(s"Get Request sent to DES for safeID: $safeId")
-      http.GET[HttpResponse](s"$serviceUrl/$cbcSubscribeURI/$safeId").recover{
-        case e:HttpException => HttpResponse(e.responseCode,responseString = Some(e.message))
-      }
-    }
-
-
-  }
-
-  @Singleton
-  class DESConnectorImpl @Inject() (val ec: ExecutionContext,
-                                    val auditConnector:AuditConnectorI,
-                                    val configuration:Configuration,
-                                    val runMode:RunMode) extends DESConnector with GenericAppConfig {
-    lazy val serviceUrl: String = baseUrl("etmp-hod")
-    lazy val orgLookupURI: String = "registration/organisation"
-    lazy val cbcSubscribeURI: String = "country-by-country/subscription"
-    lazy val urlHeaderEnvironment: String = config("etmp-hod").getString("environment").getOrElse("")
-    lazy val urlHeaderAuthorization: String = s"Bearer ${config("etmp-hod").getString("authorization-token").getOrElse("")}"
-    val audit = new Audit("known-fact-checking", auditConnector)
-    val http = new  HttpPost with HttpGet with HttpPut with  WSGet with WSPost with WSPut with GenericAppConfig {
-      override val hooks: Seq[HttpHook] = NoneRequired
-
-      override protected def configuration: Option[Config] = Some(runModeConfiguration.underlying)
+  def lookup(utr: String): Future[HttpResponse] = {
+    implicit val hc: HeaderCarrier = createHeaderCarrier
+    Logger.info(s"Lookup Request sent to DES: POST $serviceUrl/$orgLookupURI/utr/$utr")
+    http.POST[JsValue, HttpResponse](s"$serviceUrl/$orgLookupURI/utr/$utr", Json.toJson(lookupData)).recover {
+      case e: HttpException => HttpResponse(e.responseCode, responseString = Some(e.message))
     }
   }
+
+  def createSubscription(sub: SubscriptionRequest): Future[HttpResponse] = {
+    implicit val hc: HeaderCarrier = createHeaderCarrier
+    implicit val writes = SubscriptionRequest.subscriptionWriter
+    Logger.info(s"Create Request sent to DES: ${Json.toJson(sub)} for safeID: ${sub.safeId}")
+    http.POST[SubscriptionRequest, HttpResponse](s"$serviceUrl/$cbcSubscribeURI", sub).recover {
+      case e: HttpException => HttpResponse(e.responseCode, responseString = Some(e.message))
+    }
+  }
+
+  def createMigration(mig: MigrationRequest): Future[HttpResponse] = {
+    implicit val hc: HeaderCarrier = createHeaderCarrier
+    implicit val writes = MigrationRequest.migrationWriter
+    Logger.info(s"Migration Request sent to DES for safeId: ${mig.safeId} and CBCId: ${mig.cBCId}")
+
+    Logger.warn(s"stubMigration set to: $stubMigration")
+    val res = Promise[HttpResponse]()
+    Future {
+      if (!stubMigration) {
+        Logger.info("calling ETMP for migration")
+        Thread.sleep(delayMigration)
+        http.POST[MigrationRequest, HttpResponse](s"$serviceUrl/$cbcSubscribeURI", mig).recover {
+          case e: HttpException => HttpResponse(e.responseCode, responseString = Some(e.message))
+        }.map(r => {
+          Logger.info(s"Migration Status for safeId: ${mig.safeId} and cBCId: ${mig.cBCId} ${r.status}")
+          res.success(r)
+        })
+      } else {
+        Logger.info("in migration stub")
+
+        Thread.sleep(delayMigration)
+        res.success(HttpResponse(200, responseString = Some(s"migrated ${mig.cBCId}")))
+      }
+    }
+    res.future
+  }
+
+  def updateSubscription(safeId: String, cor: CorrespondenceDetails): Future[HttpResponse] = {
+    implicit val hc: HeaderCarrier = createHeaderCarrier
+    implicit val format = CorrespondenceDetails.updateWriter
+    Logger.info(s"Update Request sent to DES: $cor for safeID: $safeId")
+    http.PUT[CorrespondenceDetails, HttpResponse](s"$serviceUrl/$cbcSubscribeURI/$safeId", cor).recover {
+      case e: HttpException => HttpResponse(e.responseCode, responseString = Some(e.message))
+    }
+  }
+
+  def getSubscription(safeId: String): Future[HttpResponse] = {
+    implicit val hc: HeaderCarrier = createHeaderCarrier
+    Logger.info(s"Get Request sent to DES for safeID: $safeId")
+    http.GET[HttpResponse](s"$serviceUrl/$cbcSubscribeURI/$safeId").recover {
+      case e: HttpException => HttpResponse(e.responseCode, responseString = Some(e.message))
+    }
+  }
+
+}

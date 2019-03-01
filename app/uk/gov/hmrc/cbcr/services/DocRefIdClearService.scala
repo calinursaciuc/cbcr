@@ -16,59 +16,55 @@
 
 package uk.gov.hmrc.cbcr.services
 
-import javax.inject.{Inject, Singleton}
-
 import cats.data.EitherT
 import cats.instances.all._
 import cats.syntax.all._
-import configs.syntax._
+import javax.inject.{Inject, Singleton}
+import play.api.Logger
 import play.api.libs.json.Json
-import play.api.{Configuration, Logger}
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
+import uk.gov.hmrc.cbcr.config.DocRefIdConfig
 import uk.gov.hmrc.cbcr.models.DocRefId
 import uk.gov.hmrc.cbcr.repositories.{DocRefIdRepository, ReportingEntityDataRepo}
-import uk.gov.hmrc.play.audit.http.connector.AuditResult
+import uk.gov.hmrc.play.audit.http.connector.{AuditConnector, AuditResult}
 import uk.gov.hmrc.play.audit.model.ExtendedDataEvent
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 @Singleton
-class DocRefIdClearService @Inject()(docRefIdRepo:DocRefIdRepository,
+class DocRefIdClearService @Inject()(docRefIdRepo: DocRefIdRepository,
                                      reportingEntityDataRepo: ReportingEntityDataRepo,
-                                     configuration:Configuration,
-                                     runMode: RunMode,
-                                     audit: AuditConnectorI)(implicit ec:ExecutionContext){
+                                     audit: AuditConnector,
+                                     docRefIdConfig: DocRefIdConfig)(implicit ec: ExecutionContext) {
 
   private val DOCREFID_AUDIT = "CBCR-DocRefIdClear"
 
-  val docRefIds: List[DocRefId] = configuration.underlying.get[String](s"${runMode.env}.DocRefId.clear").valueOr(_ => "").split("_").toList.map(DocRefId.apply)
+  val docRefIds: List[DocRefId] = docRefIdConfig.docRefIdClear.split("_").toList.map(DocRefId.apply)
 
   if (docRefIds.nonEmpty) {
     Logger.info(s"About to clear DocRefIds:\n${docRefIds.mkString("\n")}")
-    docRefIds.map{ d =>
+    docRefIds.map { d =>
       (for {
         _ <- EitherT.right(docRefIdRepo.delete(d))
         _ <- EitherT.right(reportingEntityDataRepo.delete(d))
         _ <- auditDocRefIdClear(d)
       } yield ()).value
-    }.sequence[Future,Either[String,Unit]].map(_.separate._1.foreach(Logger.error(_))).onComplete{
+    }.sequence[Future, Either[String, Unit]].map(_.separate._1.foreach(Logger.error(_))).onComplete {
       case Success(_) => Logger.info(s"Successfully deleted and audited ${docRefIds.size} DocRefIds")
       case Failure(t) => Logger.error(s"Error in deleting and auditing the docRefIds: ${t.getMessage}", t)
     }
   }
 
 
-  private def auditDocRefIdClear(docRefId: DocRefId): EitherT[Future,String,Unit] = {
-    EitherT[Future,String,Unit](
+  private def auditDocRefIdClear(docRefId: DocRefId): EitherT[Future, String, Unit] = {
+    EitherT[Future, String, Unit](
       audit.sendExtendedEvent(ExtendedDataEvent("Country-By-Country-Backend", DOCREFID_AUDIT,
         detail = Json.obj(
           "docRefId" -> Json.toJson(docRefId)
         )
       )).map {
-        case AuditResult.Success          => Right(())
-        case AuditResult.Failure(msg, _)  => Left(s"failed to audit: $msg")
-        case AuditResult.Disabled         => Right(())
+        case AuditResult.Success => Right(())
+        case AuditResult.Failure(msg, _) => Left(s"failed to audit: $msg")
+        case AuditResult.Disabled => Right(())
       })
   }
 }

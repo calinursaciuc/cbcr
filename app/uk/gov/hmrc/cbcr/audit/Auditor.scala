@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cbcr.audit
+package audit
 
 import javax.inject.{Inject, Singleton}
-import com.google.inject.ImplementedBy
-import play.api.Environment
-import uk.gov.hmrc.cbcr.config.GenericAppConfig
-import uk.gov.hmrc.play.audit.http.config.AuditingConfig
+import scala.concurrent.ExecutionContext.Implicits.global
+import play.api.Logger
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
-import uk.gov.hmrc.play.microservice.config.LoadAuditingConfig
-
-
-/**
-  * This simply wraps the existing AuditConnector with Guice annotation to allow for injection
-  */
-@ImplementedBy(classOf[AuditConnectorIImpl])
-trait AuditConnectorI extends AuditConnector
+import uk.gov.hmrc.play.audit.model.DataEvent
+import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 @Singleton
-class AuditConnectorIImpl @Inject() (val environment: Environment) extends AuditConnectorI with GenericAppConfig {
-  override def auditingConfig: AuditingConfig = LoadAuditingConfig("auditing")
+class Auditor @Inject()(val auditConnector: AuditConnector) {
+
+  def sendEvent(event: DataEvent)(implicit hc: HeaderCarrier): Future[Unit] = {
+    auditConnector
+      .sendEvent(event)
+      .map(_ => ())
+      .recover {
+        case NonFatal(e) => Logger.warn(s"Unable to post audit event of type ${event.auditType} to audit connector - ${e.getMessage}", e)
+      }
+  }
 }

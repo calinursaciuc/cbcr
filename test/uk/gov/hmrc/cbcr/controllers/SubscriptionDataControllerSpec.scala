@@ -31,6 +31,7 @@ import play.api.libs.json.Json._
 import play.api.mvc.AnyContentAsEmpty
 import play.api.test.{FakeRequest, Helpers}
 import reactivemongo.api.commands.{DefaultWriteResult, WriteError, WriteResult}
+import uk.gov.hmrc.cbcr.config.CbcrIdConfig
 import uk.gov.hmrc.cbcr.connectors.DESConnector
 import uk.gov.hmrc.cbcr.models._
 import uk.gov.hmrc.cbcr.repositories.SubscriptionDataRepository
@@ -57,7 +58,7 @@ class SubscriptionDataControllerSpec extends UnitSpec with MockitoSugar with Moc
 
   val desConnector = mock[DESConnector]
   when(store.getSubscriptions(DataMigrationCriteria.LOCAL_CBCID_CRITERIA)) thenReturn Future.successful(List())
-  val controller = new SubscriptionDataController(store,desConnector,cBCRAuth,config)
+  val controller = new SubscriptionDataController(store,desConnector,cBCRAuth)
 
   val fakePostRequest: FakeRequest[JsValue] = FakeRequest(Helpers.POST, "/saveSubscriptionData").withBody(toJson(exampleSubscriptionData))
 

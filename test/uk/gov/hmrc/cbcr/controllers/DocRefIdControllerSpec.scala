@@ -27,9 +27,9 @@ import play.api.Configuration
 import play.api.http.Status
 import play.api.test.{FakeRequest, Helpers}
 import reactivemongo.api.commands.{DefaultWriteResult, WriteError}
+import uk.gov.hmrc.cbcr.config.CbcrIdConfig
 import uk.gov.hmrc.cbcr.models._
 import uk.gov.hmrc.cbcr.repositories.DocRefIdRepository
-import uk.gov.hmrc.cbcr.services.RunMode
 import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.concurrent.Future
@@ -52,9 +52,9 @@ class DocRefIdControllerSpec extends UnitSpec with OneAppPerSuite with MockitoSu
   val config = app.injector.instanceOf[Configuration]
 
   val repo = mock[DocRefIdRepository]
+  val testConfig = CbcrIdConfig(true, true, 60, true, true, true, "", true, "", "", "")
 
-  val runMode = mock[RunMode]
-  val controller = new DocRefIdController(repo,config,cBCRAuth, runMode)
+  val controller = new DocRefIdController(repo, cBCRAuth, testConfig)
 
   "The DocRefIdController" should {
     "be able to save a DocRefID and" should {
@@ -129,9 +129,8 @@ class DocRefIdControllerSpec extends UnitSpec with OneAppPerSuite with MockitoSu
       }
     }
     "be able to delete a DocRefId" when {
-      val runMode = mock[RunMode]
-      when(runMode.env) thenReturn "Dev"
-      val controller = new DocRefIdController(repo,config ++ Configuration("Dev.CBCId.enableTestApis" -> true),cBCRAuth, runMode)
+
+      val controller = new DocRefIdController(repo, cBCRAuth, testConfig)
       "it exists and return a 200" in {
         when(repo.delete(any())).thenReturn(Future.successful(DefaultWriteResult(true, 1, Seq.empty, None, None, None)))
         val result = controller.deleteDocRefId(DocRefId("stuff"))(fakeDeleteRequest)
@@ -148,7 +147,7 @@ class DocRefIdControllerSpec extends UnitSpec with OneAppPerSuite with MockitoSu
         status(result) shouldBe Status.INTERNAL_SERVER_ERROR
       }
       "return NOT_IMPLEMENTED if enableTestApis = false" in {
-        val controller = new DocRefIdController(repo,config ++ Configuration("Dev.CBCId.enableTestApis" -> false),cBCRAuth, runMode)
+        val controller = new DocRefIdController(repo, cBCRAuth, testConfig)
         val result = controller.deleteDocRefId(DocRefId("stuff"))(fakeDeleteRequest)
         status(result) shouldBe Status.NOT_IMPLEMENTED
       }

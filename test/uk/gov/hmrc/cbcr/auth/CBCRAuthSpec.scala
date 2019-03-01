@@ -20,20 +20,23 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{reset, when}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.mock.MockitoSugar
+import org.scalatestplus.play.OneAppPerSuite
 import play.api.http.Status
 import play.api.mvc.Results.{Ok, Unauthorized}
 import play.api.mvc.{AnyContent, Request, Result}
 import play.api.test.FakeRequest
-import uk.gov.hmrc.auth.core.{AffinityGroup, MissingBearerToken}
+import uk.gov.hmrc.auth.core.{AffinityGroup, AuthConnector, AuthorisedFunctions, MissingBearerToken}
 import uk.gov.hmrc.auth.core.retrieve.Retrieval
 import uk.gov.hmrc.play.test.UnitSpec
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class CBCRAuthSpec extends UnitSpec with MockitoSugar with BeforeAndAfterEach {
+class CBCRAuthSpec extends UnitSpec with MockitoSugar with BeforeAndAfterEach with OneAppPerSuite {
 
-  val mockMicroServiceAuthConnector = mock[MicroServiceAuthConnector]
-  val cBCRAuth = new CBCRAuth(mockMicroServiceAuthConnector)
+  implicit lazy val mockMicroServiceAuthConnector = mock[AuthConnector]
+  lazy val af = mock[AuthorisedFunctions]
+  val cBCRAuth = new CBCRAuth(af)
   private type AuthAction = Request[AnyContent] => Future[Result]
 
   val authAction: AuthAction = { implicit request  => Future successful Ok }

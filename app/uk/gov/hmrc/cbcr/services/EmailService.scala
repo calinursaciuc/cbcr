@@ -17,30 +17,28 @@
 package uk.gov.hmrc.cbcr.services
 
 import javax.inject.{Inject, Singleton}
-import play.api.{Configuration, Logger}
+import play.api.Logger
 import play.api.libs.json.{JsString, Json}
 import play.api.mvc.Result
-import uk.gov.hmrc.cbcr.connectors.EmailConnectorImpl
-import uk.gov.hmrc.cbcr.models.Email
 import play.api.mvc.Results._
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
-
+import uk.gov.hmrc.cbcr.config.EmailConfig
+import uk.gov.hmrc.cbcr.connectors.EmailConnector
+import uk.gov.hmrc.cbcr.models.Email
+import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.audit.http.connector.{AuditConnector, AuditResult}
+import uk.gov.hmrc.play.audit.model.ExtendedDataEvent
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.audit.model.ExtendedDataEvent
-import uk.gov.hmrc.play.audit.AuditExtensions._
-import uk.gov.hmrc.play.audit.http.connector.AuditResult
 
 @Singleton
-class EmailService @Inject()(emailConnector:EmailConnectorImpl, auditConnector:AuditConnectorI,
-                             configuration:Configuration,
-                             runMode: RunMode) {
+class EmailService @Inject()(emailConnector: EmailConnector,
+                             auditConnector: AuditConnector,
+                             emailConfig: EmailConfig
+                            ) {
 
-  private val ALERT_GENERATION_STRING_TO_CREATE_PAGER_DUTY =
-    configuration.getString(s"${runMode.env}.emailAlertLogString").getOrElse("CBCR_EMAIL_FAILURE")
+  private val ALERT_GENERATION_STRING_TO_CREATE_PAGER_DUTY = emailConfig.emailAlertLogString //getOrElse("CBCR_EMAIL_FAILURE")
 
-  def sendEmail(email:Email)(implicit hc:HeaderCarrier):Future[Result] = {
+  def sendEmail(email: Email)(implicit hc: HeaderCarrier): Future[Result] = {
     emailConnector.sendEmail(email).map(res => res.status match {
       case 202 =>
         Logger.info("CBCR Successfully sent email")
@@ -54,7 +52,7 @@ class EmailService @Inject()(emailConnector:EmailConnectorImpl, auditConnector:A
     }
   }
 
-  def audit(email:Email, auditType:AuditType)(implicit hc:HeaderCarrier) = {
+  def audit(email: Email, auditType: AuditType)(implicit hc: HeaderCarrier) = {
     auditConnector.sendExtendedEvent(ExtendedDataEvent(auditSource = "Country-By-Country", auditType.toString,
       detail = Json.obj(
         "email" -> Json.toJson(email),
@@ -70,5 +68,7 @@ class EmailService @Inject()(emailConnector:EmailConnectorImpl, auditConnector:A
 }
 
 sealed trait AuditType
-  case object CBCREmailFailure extends AuditType
-  case object CBCREmailSuccess extends AuditType
+
+case object CBCREmailFailure extends AuditType
+
+case object CBCREmailSuccess extends AuditType

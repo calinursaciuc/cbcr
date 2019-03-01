@@ -17,32 +17,18 @@
 package uk.gov.hmrc.cbcr.auth
 
 import javax.inject.{Inject, Singleton}
-import play.api.Logger
 import play.api.libs.json.JsValue
 import play.api.mvc._
 import uk.gov.hmrc.auth.core._
-import uk.gov.hmrc.auth.core.authorise.Predicate
 import uk.gov.hmrc.auth.core.retrieve.AuthProvider.GovernmentGateway
-import uk.gov.hmrc.auth.core.retrieve.{AuthProviders, Retrieval}
+import uk.gov.hmrc.auth.core.retrieve.AuthProviders
 import uk.gov.hmrc.auth.core.retrieve.Retrievals.affinityGroup
-import uk.gov.hmrc.cbcr.config.GenericAppConfig
-import uk.gov.hmrc.http.{HeaderCarrier, HttpPost}
-import uk.gov.hmrc.play.config.ServicesConfig
-import uk.gov.hmrc.play.microservice.controller.BaseController
 import uk.gov.hmrc.play.HeaderCarrierConverter
-
-import scala.concurrent.ExecutionContext.Implicits.global
+import uk.gov.hmrc.play.bootstrap.controller.BaseController
 import scala.concurrent.{ExecutionContext, Future}
-@Singleton
-class MicroServiceAuthConnector @Inject()(val http:HttpPost)  extends PlayAuthConnector with ServicesConfig with GenericAppConfig {
-  val serviceUrl: String = baseUrl("auth")
-
-}
 
 @Singleton
-class CBCRAuth @Inject()(val microServiceAuthConnector: MicroServiceAuthConnector) extends AuthorisedFunctions with BaseController {
-  override def authConnector: AuthConnector = microServiceAuthConnector
-
+class CBCRAuth @Inject()(val af: AuthorisedFunctions)(implicit val ec: ExecutionContext) extends BaseController {
   private val AuthProvider: AuthProviders = AuthProviders(GovernmentGateway)
   private type AuthAction[A] = Request[A] => Future[Result]
 
@@ -59,7 +45,7 @@ class CBCRAuth @Inject()(val microServiceAuthConnector: MicroServiceAuthConnecto
 
   def authCommon[A](action: AuthAction[A])(implicit request:Request[A]):Future[Result] ={
     implicit val hc = HeaderCarrierConverter.fromHeadersAndSession(request.headers)
-    authorised(AuthProvider).retrieve(affinityGroup) {
+    af.authorised(AuthProvider).retrieve(affinityGroup) {
       case Some(affinityG) if isAgentOrOrganisation(affinityG) ⇒ action(request)
       case _ => Future.successful(Unauthorized)
     }.recover[Result]{

@@ -17,27 +17,25 @@
 package uk.gov.hmrc.cbcr.services
 
 import javax.inject.Inject
-import play.api.{Configuration, Logger}
+import play.api.Logger
 import play.api.libs.json.{JsString, Json}
+import uk.gov.hmrc.cbcr.config.AuditSubscriptionConfig
 import uk.gov.hmrc.cbcr.models.{CBCId, SubscriptionDetails}
 import uk.gov.hmrc.cbcr.repositories.SubscriptionDataRepository
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
-import uk.gov.hmrc.play.audit.http.connector.AuditResult
+import uk.gov.hmrc.play.audit.http.connector.{AuditConnector, AuditResult}
 import uk.gov.hmrc.play.audit.model.ExtendedDataEvent
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-class AuditSubscriptionService @Inject() (repo:SubscriptionDataRepository,
-                                          configuration:Configuration,
-                                          runMode: RunMode,
-                                          audit: AuditConnectorI) (implicit ex: ExecutionContext) {
+class AuditSubscriptionService @Inject()(repo:SubscriptionDataRepository,
+                                          audit: AuditConnector,
+                                          auditSubscriptionConfig: AuditSubscriptionConfig)(implicit ex: ExecutionContext) {
 
-  val auditSubscriptions: Boolean = configuration.getBoolean(s"${runMode.env}.audit.subscriptions").getOrElse(false)
+  val auditSubscriptions: Boolean = auditSubscriptionConfig.auditSubscriptions
   Logger.info(s"auditSubscriptions set to: $auditSubscriptions")
 
   if (auditSubscriptions) {
-    val cbcIds: List[CBCId] = configuration.getString(s"${runMode.env}.audit.cbcIds").getOrElse("").split("_").toList.flatMap(CBCId.apply)
+    val cbcIds: List[CBCId] = auditSubscriptionConfig.cbcIds.split("_").toList.flatMap(CBCId.apply)
     val subscriptions = Json.obj("cbcId" -> Json.obj("$in" -> cbcIds))
 
     repo.getSubscriptions(subscriptions).map(sd => sd.foreach( s => auditSubscriptionDetails(s).onComplete {

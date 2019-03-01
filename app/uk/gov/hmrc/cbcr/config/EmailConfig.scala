@@ -14,19 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cbcr
+package uk.gov.hmrc.cbcr.config
 
-import com.google.inject.{AbstractModule, Provides}
-import uk.gov.hmrc.auth.core.{AuthConnector, AuthorisedFunctions}
-import uk.gov.hmrc.cbcr.config.ConfigModule
+import com.google.inject.Inject
+import uk.gov.hmrc.play.config.ServicesConfig
 
-class Module extends AbstractModule {
-
-  def configure(): Unit = install(new ConfigModule)
-
-  @Provides
-  def authorisedFunctions(ac: AuthConnector): AuthorisedFunctions = new AuthorisedFunctions {
-    override def authConnector: AuthConnector = ac
+case class EmailConfig(baseUrl: String, emailAlertLogString: String) {
+  @Inject
+  def this(servicesConfig: ServicesConfig) = {
+    this(baseUrl = servicesConfig.baseUrl("email"),
+      emailAlertLogString = servicesConfig.getString("emailAlertLogString"))
   }
 }
-

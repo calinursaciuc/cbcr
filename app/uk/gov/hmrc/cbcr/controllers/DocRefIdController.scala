@@ -17,19 +17,18 @@
 package uk.gov.hmrc.cbcr.controllers
 
 import javax.inject.{Inject, Singleton}
-
-import play.api.Configuration
 import play.api.mvc.Action
 import uk.gov.hmrc.cbcr.auth.CBCRAuth
+import uk.gov.hmrc.cbcr.config.CbcrIdConfig
 import uk.gov.hmrc.cbcr.models.{DocRefIdResponses, _}
 import uk.gov.hmrc.cbcr.repositories.DocRefIdRepository
-import uk.gov.hmrc.cbcr.services.RunMode
-import uk.gov.hmrc.play.microservice.controller.BaseController
-
+import uk.gov.hmrc.play.bootstrap.controller.BaseController
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class DocRefIdController @Inject()(repo: DocRefIdRepository,config: Configuration, auth: CBCRAuth, runMode: RunMode)(implicit ec: ExecutionContext) extends BaseController {
+class DocRefIdController @Inject()(repo: DocRefIdRepository,
+                                   auth: CBCRAuth,
+                                   cbcrIdConfig: CbcrIdConfig)(implicit ec: ExecutionContext) extends BaseController {
 
   def query(docRefId: DocRefId) = auth.authCBCR { implicit request =>
     repo.query(docRefId).map {
@@ -59,17 +58,16 @@ class DocRefIdController @Inject()(repo: DocRefIdRepository,config: Configuratio
     }
   }
 
-  def deleteDocRefId(docRefId: DocRefId) = Action.async{ implicit request =>
-    if(config.underlying.getBoolean(s"${runMode.env}.CBCId.enableTestApis")) {
+  def deleteDocRefId(docRefId: DocRefId) = Action.async { implicit request =>
+    if (cbcrIdConfig.enableTestApis) {
       repo.delete(docRefId).map {
         case w if w.ok && w.n >= 1 => Ok
         case w if w.ok && w.n == 0 => NotFound
-        case _                     => InternalServerError
+        case _ => InternalServerError
       }
     } else {
       Future.successful(NotImplemented)
     }
   }
-
 
 }

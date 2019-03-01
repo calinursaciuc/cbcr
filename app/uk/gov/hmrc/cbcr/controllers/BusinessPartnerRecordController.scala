@@ -17,12 +17,9 @@
 package uk.gov.hmrc.cbcr.controllers
 
 import javax.inject.{Inject, Singleton}
-
-import play.api.mvc.{Action, BodyParsers}
 import uk.gov.hmrc.cbcr.auth.CBCRAuth
 import uk.gov.hmrc.cbcr.connectors.DESConnector
-import uk.gov.hmrc.play.microservice.controller.BaseController
-
+import uk.gov.hmrc.play.bootstrap.controller.BaseController
 import scala.concurrent.ExecutionContext
 
 @Singleton

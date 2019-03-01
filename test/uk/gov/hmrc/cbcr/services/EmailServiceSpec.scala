@@ -24,25 +24,24 @@ import org.scalatestplus.play.OneAppPerSuite
 import play.api.Configuration
 import play.api.mvc.Result
 import play.api.mvc.Results._
-import uk.gov.hmrc.cbcr.audit.AuditConnectorI
-import uk.gov.hmrc.cbcr.connectors.EmailConnectorImpl
+import uk.gov.hmrc.cbcr.config.EmailConfig
+import uk.gov.hmrc.cbcr.connectors.EmailConnector
 import uk.gov.hmrc.cbcr.models.Email
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse}
-import uk.gov.hmrc.play.audit.http.connector.AuditResult
-import uk.gov.hmrc.play.audit.http.connector.AuditResult.{Success,Disabled,Failure}
+import uk.gov.hmrc.play.audit.http.connector.AuditConnector
+import uk.gov.hmrc.play.audit.http.connector.AuditResult.{Disabled, Failure, Success}
 import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.concurrent.Future
 
 class EmailServiceSpec extends UnitSpec with MockitoSugar with OneAppPerSuite with ScalaFutures {
 
-  val mockEmailConnector = mock[EmailConnectorImpl]
-  val mockAuditConnector = mock[AuditConnectorI]
-  val runMode = mock[RunMode]
+  val mockEmailConnector = mock[EmailConnector]
+  val mockAuditConnector = mock[AuditConnector]
   val config = app.injector.instanceOf[Configuration]
+  val mockEmailConfig = app.injector.instanceOf[EmailConfig]
 
-
-  val emailService = new EmailService(mockEmailConnector, mockAuditConnector, config, runMode)
+  val emailService = new EmailService(mockEmailConnector, mockAuditConnector, mockEmailConfig)
   val paramsSub = Map("f_name" → "Tyrion","s_name" → "Lannister", "cbcrId" -> "XGCBC0000000001")
   val correctEmail: Email = Email(List("tyrion.lannister@gmail.com"), "cbcr_subscription", paramsSub)
   implicit val hc = HeaderCarrier()
@@ -52,7 +51,7 @@ class EmailServiceSpec extends UnitSpec with MockitoSugar with OneAppPerSuite wi
 
       when(mockEmailConnector.sendEmail(any())(any())) thenReturn Future.successful(HttpResponse(202))
       when(mockAuditConnector.sendExtendedEvent(any())(any(), any())) thenReturn Future.successful(Success)
-      when(runMode.env) thenReturn "Dev"
+
       val result: Future[Result] = emailService.sendEmail(correctEmail)
       await(result) shouldBe Accepted
     }
@@ -61,7 +60,6 @@ class EmailServiceSpec extends UnitSpec with MockitoSugar with OneAppPerSuite wi
 
       when(mockEmailConnector.sendEmail(any())(any())) thenReturn Future.successful(HttpResponse(400))
       when(mockAuditConnector.sendExtendedEvent(any())(any(), any())) thenReturn Future.successful(Success)
-      when(runMode.env) thenReturn "Dev"
 
       val result: Future[Result] = emailService.sendEmail(correctEmail)
       await(result) shouldBe BadRequest
@@ -71,7 +69,6 @@ class EmailServiceSpec extends UnitSpec with MockitoSugar with OneAppPerSuite wi
 
       when(mockEmailConnector.sendEmail(any())(any())) thenReturn Future.successful(HttpResponse(400))
       when(mockAuditConnector.sendExtendedEvent(any())(any(), any())) thenReturn Future.successful(Failure("test to designed to provoke an emotional response",None))
-      when(runMode.env) thenReturn "Dev"
 
       val result: Future[Result] = emailService.sendEmail(correctEmail)
       await(result) shouldBe BadRequest
@@ -81,7 +78,6 @@ class EmailServiceSpec extends UnitSpec with MockitoSugar with OneAppPerSuite wi
 
       when(mockEmailConnector.sendEmail(any())(any())) thenReturn Future.successful(HttpResponse(400))
       when(mockAuditConnector.sendExtendedEvent(any())(any(), any())) thenReturn Future.successful(Disabled)
-      when(runMode.env) thenReturn "Dev"
 
       val result: Future[Result] = emailService.sendEmail(correctEmail)
       await(result) shouldBe BadRequest

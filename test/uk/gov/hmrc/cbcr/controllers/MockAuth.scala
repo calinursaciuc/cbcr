@@ -19,21 +19,24 @@ package uk.gov.hmrc.cbcr.controllers
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.when
 import org.scalatest.mock.MockitoSugar
-import uk.gov.hmrc.auth.core.AffinityGroup
 import uk.gov.hmrc.auth.core.retrieve.Retrieval
-import uk.gov.hmrc.cbcr.auth.{CBCRAuth, MicroServiceAuthConnector}
-
+import uk.gov.hmrc.auth.core.{AffinityGroup, AuthConnector, AuthorisedFunctions}
+import uk.gov.hmrc.cbcr.auth.CBCRAuth
+import uk.gov.hmrc.http.HttpPost
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 
-trait MockAuth extends MockitoSugar{
-  val mockAuthConnector = mock[MicroServiceAuthConnector]
-  val cBCRAuth = new CBCRAuth(mockAuthConnector)
+trait MockAuth extends MockitoSugar {
+  val http = mock[HttpPost]
+  val mockAuthConnector = mock[AuthConnector]
+  val af = mock[AuthorisedFunctions]
+  val cBCRAuth = new CBCRAuth(af)
   val agentAffinity: Future[Option[AffinityGroup]] =
     Future successful Some(AffinityGroup.Agent)
 
   private def agentAuthStub(returnValue: Future[Option[AffinityGroup]]) =
-    when(mockAuthConnector.authorise(any(), any[Retrieval[Option[AffinityGroup]]]())(any(),any())).thenReturn(returnValue)
+    when(mockAuthConnector.authorise(any(), any[Retrieval[Option[AffinityGroup]]]())(any(), any())).thenReturn(returnValue)
 
   agentAuthStub(agentAffinity)
 }

@@ -14,17 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cbcr.services
+package uk.gov.hmrc.cbcr.config
 
-import javax.inject.{Inject, Singleton}
+import com.google.inject._
+import play.api.Mode.Mode
+import play.api.{Configuration, Environment}
+import uk.gov.hmrc.play.config.ServicesConfig
 
-import play.api.{Configuration, Logger}
-import configs.syntax._
+class ConfigModule extends AbstractModule {
 
-@Singleton
-class RunMode @Inject() (configuration:Configuration) {
-  private val APP_RUNNING_LOCALY: String = "Dev"
+  @Provides
+  @Singleton
+  def provideServiceConfig(environment: Environment, configuration: Configuration): ServicesConfig = new ServicesConfig {
+    def mode: Mode = environment.mode
 
-  val env: String = configuration.underlying.get[String]("run.mode").valueOr(_ => APP_RUNNING_LOCALY)
-  Logger.info(s"Current environment run.mode: $env")
+    def runModeConfiguration: Configuration = configuration
+  }
+
+  override def configure(): Unit = ()
 }
