@@ -14,15 +14,21 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cbcr
+package uk.gov.hmrc.cbcr.testsupport
 
-import com.google.inject.{AbstractModule, Provides}
-import uk.gov.hmrc.auth.core.{AuthConnector, AuthorisedFunctions}
-import uk.gov.hmrc.cbcr.config.ConfigModule
+import org.scalatest._
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
+import org.scalatest.words.ShouldVerb
 
-class Module extends AbstractModule {
-
-  def configure(): Unit = install(new ConfigModule)
-
-}
-
+trait RichMatchers
+  extends Matchers
+    with DiagrammedAssertions
+    with TryValues
+    with EitherValues
+    with OptionValues
+    with AppendedClues
+    with ScalaFutures
+    with StreamlinedXml
+    with Inside
+    with Eventually
+    with IntegrationPatience

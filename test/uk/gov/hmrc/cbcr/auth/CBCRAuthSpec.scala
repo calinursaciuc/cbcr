@@ -42,7 +42,7 @@ class CBCRAuthSpec extends UnitSpec with MockitoSugar with BeforeAndAfterEach wi
   val authAction: AuthAction = { implicit request  => Future successful Ok }
 
   private def agentAuthStub(returnValue: Future[Option[AffinityGroup]]) =
-    when(mockMicroServiceAuthConnector.authorise(any(), any[Retrieval[Option[AffinityGroup]]]())(any(),any())).thenReturn(returnValue)
+    when(mockMicroServiceAuthConnector.authorise(any(), any[Retrieval[Option[AffinityGroup]]]())(any(), any())).thenReturn(returnValue)
 
   val agentAffinity: Future[Option[AffinityGroup]] =
     Future successful Some(AffinityGroup.Agent)

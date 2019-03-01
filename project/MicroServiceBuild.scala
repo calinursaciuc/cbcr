@@ -34,7 +34,8 @@ object MicroServiceBuild extends Build with MicroService {
     "org.scalatestplus.play" %% "scalatestplus-play" % "2.0.1" % scope,
     "org.mockito" % "mockito-core" % "2.23.4" % scope,
     "org.scalacheck" %% "scalacheck" % "1.13.4" % scope,
-    "org.eu.acolyte" % "play-reactive-mongo_2.11" % "1.0.43-j7p" % scope
+    "org.eu.acolyte" % "play-reactive-mongo_2.11" % "1.0.43-j7p" % scope,
+    "com.github.tomakehurst" % "wiremock" % "2.17.0" % "test"
   )
 
 }

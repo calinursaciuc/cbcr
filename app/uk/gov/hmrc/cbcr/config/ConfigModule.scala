@@ -19,6 +19,7 @@ package uk.gov.hmrc.cbcr.config
 import com.google.inject._
 import play.api.Mode.Mode
 import play.api.{Configuration, Environment}
+import uk.gov.hmrc.auth.core.{AuthConnector, AuthorisedFunctions}
 import uk.gov.hmrc.play.config.ServicesConfig
 
 class ConfigModule extends AbstractModule {
@@ -29,6 +30,12 @@ class ConfigModule extends AbstractModule {
     def mode: Mode = environment.mode
 
     def runModeConfiguration: Configuration = configuration
+  }
+
+  @Provides
+  @Singleton
+  def authorisedFunctions(ac: AuthConnector): AuthorisedFunctions = new AuthorisedFunctions {
+    override def authConnector: AuthConnector = ac
   }
 
   override def configure(): Unit = ()
