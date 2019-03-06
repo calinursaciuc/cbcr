@@ -18,7 +18,7 @@ package uk.gov.hmrc.cbcr.config
 
 import com.google.inject.Inject
 import play.api.libs.json.{Format, Json}
-import uk.gov.hmrc.play.config.ServicesConfig
+import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 case class DesConfig(serviceUrl: String,
                      urlHeaderEnvironment: String,

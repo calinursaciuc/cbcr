@@ -17,18 +17,19 @@
 package uk.gov.hmrc.cbcr.controllers
 
 import javax.inject.{Inject, Singleton}
-import play.api.mvc.Action
+import play.api.mvc.ControllerComponents
 import uk.gov.hmrc.cbcr.auth.CBCRAuth
 import uk.gov.hmrc.cbcr.config.CbcrIdConfig
 import uk.gov.hmrc.cbcr.models.{DocRefIdResponses, _}
 import uk.gov.hmrc.cbcr.repositories.DocRefIdRepository
-import uk.gov.hmrc.play.bootstrap.controller.BaseController
+import uk.gov.hmrc.play.bootstrap.controller.BackendController
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class DocRefIdController @Inject()(repo: DocRefIdRepository,
                                    auth: CBCRAuth,
-                                   cbcrIdConfig: CbcrIdConfig)(implicit ec: ExecutionContext) extends BaseController {
+                                   cbcrIdConfig: CbcrIdConfig,
+                                   cc: ControllerComponents)(implicit ec: ExecutionContext) extends BackendController(cc) {
 
   def query(docRefId: DocRefId) = auth.authCBCR { implicit request =>
     repo.query(docRefId).map {

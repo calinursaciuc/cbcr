@@ -72,11 +72,11 @@ class CBCIdControllerSpec extends ItSpec with ScalaFutures with MockitoSugar wit
     reset(localGen,remoteGen)
   }
 
-  //"The CBCIdController" should {
+  "The CBCIdController" - {
     "query the localCBCId generator when useDESApi is set to false" in {
 AuthResponses.authorisedResponse()
       val handler = new SubscriptionHandlerImpl(testConfig(false),localGen,remoteGen)
-      val controller = new CBCIdController(handler,clientAuth)
+      val controller = new CBCIdController(handler,clientAuth, cc)
       val fakeRequestSubscribe = FakeRequest("POST", "/cbc-id").withBody(Json.toJson(srb))
       when(localGen.createSubscription(any())(any())) thenReturn Future.successful(Ok(Json.obj("cbc-id" -> id.value)))
       val response = controller.subscribe()(fakeRequestSubscribe).futureValue
@@ -86,7 +86,7 @@ AuthResponses.authorisedResponse()
     "query the remoteCBCId generator when useDESApi is set to true" in {
       AuthResponses.authorisedResponse()
       val handler = new SubscriptionHandlerImpl(testConfig(true),localGen,remoteGen)
-      val controller = new CBCIdController(handler,cBCRAuth)
+      val controller = new CBCIdController(handler,clientAuth, cc)
       val fakeRequestSubscribe = FakeRequest("POST", "/cbc-id").withBody(Json.toJson(srb))
       when(remoteGen.createSubscription(any())(any())) thenReturn Future.successful(Ok(Json.obj("cbc-id" -> id.value)))
       val response = controller.subscribe()(fakeRequestSubscribe)
@@ -96,7 +96,7 @@ AuthResponses.authorisedResponse()
     "generate bad request response if request doesn't contain valid subscriptionDetails" in {
 AuthResponses.authorisedResponse()
       val handler = new SubscriptionHandlerImpl(testConfig(false),localGen,remoteGen)
-      val controller = new CBCIdController(handler,cBCRAuth)
+      val controller = new CBCIdController(handler,clientAuth, cc)
       val fakeRequestSubscribe = FakeRequest("POST", "/cbc-id").withBody(Json.obj("bad" -> "request"))
       val response = controller.subscribe()(fakeRequestSubscribe)
       status(response) shouldBe Status.BAD_REQUEST
@@ -104,7 +104,7 @@ AuthResponses.authorisedResponse()
     "return 200 when updateSubscription passed valid CorrespondenceDetails in request" in {
 AuthResponses.authorisedResponse()
       val handler = new SubscriptionHandlerImpl(testConfig(true),localGen,remoteGen)
-      val controller = new CBCIdController(handler,cBCRAuth)
+      val controller = new CBCIdController(handler,clientAuth, cc)
       val fakeRequestSubscribe = FakeRequest("POST", "/cbc-id").withBody(Json.toJson(crb))
       when(remoteGen.updateSubscription(any(),any())(any())) thenReturn Future.successful(Ok(Json.obj("cbc-id" -> id.value)))
       val response = controller.updateSubscription("safeId")(fakeRequestSubscribe)
@@ -113,7 +113,7 @@ AuthResponses.authorisedResponse()
     "return 400 when updateSubscription passed invalid CorrespondenceDetails in request" in {
 AuthResponses.authorisedResponse()
       val handler = new SubscriptionHandlerImpl(testConfig(true),localGen,remoteGen)
-      val controller = new CBCIdController(handler,cBCRAuth)
+      val controller = new CBCIdController(handler,clientAuth, cc)
       val fakeRequestSubscribe = FakeRequest("POST", "/cbc-id").withBody(Json.obj("bad" -> "request"))
       val response = controller.updateSubscription("safeId")(fakeRequestSubscribe)
       status(response) shouldBe Status.BAD_REQUEST
@@ -122,12 +122,12 @@ AuthResponses.authorisedResponse()
     "no error generated when getSubscription called" in {
 AuthResponses.authorisedResponse()
       val handler = new SubscriptionHandlerImpl(testConfig(false),localGen,remoteGen)
-      val controller = new CBCIdController(handler,cBCRAuth)
+      val controller = new CBCIdController(handler,clientAuth, cc)
       val fakeRequestSubscribe = FakeRequest("GET", "/cbc-id")
       when(localGen.getSubscription(any())(any())) thenReturn Future.successful(Ok(Json.obj("some" -> "thing")))
       val response = controller.getSubscription("safeId")(fakeRequestSubscribe)
       status(response) shouldBe Status.OK
     }
-  //}
+  }
 
 }

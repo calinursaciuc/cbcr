@@ -32,7 +32,7 @@ class BusinessPartnerRecordControllerSpec extends ItSpec {
 
   val dc = mock[DESConnector]
   lazy val authClient = app.injector.instanceOf[CBCRAuth]
-  val controller = new BusinessPartnerRecordController(dc, authClient)
+  val controller = new BusinessPartnerRecordController(dc, authClient, cc)
 
   "respond with a 200 if the UTR is matched" in {
     AuthResponses.authorisedResponse()

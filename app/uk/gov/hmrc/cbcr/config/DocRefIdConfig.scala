@@ -17,7 +17,7 @@
 package uk.gov.hmrc.cbcr.config
 
 import com.google.inject.Inject
-import uk.gov.hmrc.play.config.ServicesConfig
+import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 case class DocRefIdConfig(docRefIdClear: String) {
 

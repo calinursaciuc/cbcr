@@ -19,19 +19,21 @@ package uk.gov.hmrc.cbcr.controllers
 import cats.instances.all._
 import javax.inject.{Inject, Singleton}
 import play.api.libs.json.{JsError, JsValue, Json}
-import play.api.mvc.{Action, AnyContent, Result}
+import play.api.mvc.{Action, AnyContent, ControllerComponents, Result}
 import uk.gov.hmrc.cbcr.auth.CBCRAuth
 import uk.gov.hmrc.cbcr.connectors.DESConnector
 import uk.gov.hmrc.cbcr.models._
 import uk.gov.hmrc.cbcr.repositories.SubscriptionDataRepository
-import uk.gov.hmrc.play.bootstrap.controller.BaseController
+import uk.gov.hmrc.play.bootstrap.controller.{BackendController, BaseController}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Singleton
 class SubscriptionDataController @Inject()(repo: SubscriptionDataRepository,
                                            des: DESConnector,
-                                           auth: CBCRAuth) extends BaseController {
+                                           auth: CBCRAuth,
+                                           cc: ControllerComponents) extends BackendController(cc) {
 
 
   def saveSubscriptionData(): Action[JsValue] = auth.authCBCRWithJson({ implicit request =>

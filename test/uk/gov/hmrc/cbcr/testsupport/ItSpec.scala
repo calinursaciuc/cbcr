@@ -50,18 +50,17 @@ trait ItSpec extends FreeSpec
   implicit val hc = HeaderCarrier()
 
   override implicit lazy val app: Application = new GuiceApplicationBuilder().configure(
-    "microservice.services.auth.port" -> WireMockSupport.port
+    "microservice.services.auth.port" -> WireMockSupport.port,
+    "microservice.services.email.port" -> WireMockSupport.port
   ).build()
 
   def injector: Injector = app.injector
 
-  lazy val httpClient: HttpClient = new HttpClient with WSHttp {
-    override def wsClient: WSClient = injector.instanceOf(classOf[WSClient])
-
+  val httpClient: HttpClient = new HttpClient with WSHttp {
+    override def wsClient: WSClient = app.injector.instanceOf(classOf[WSClient])
     override val hooks: Seq[HttpHook] = Nil
     override val configuration = None
-
-    override protected def actorSystem = injector.instanceOf(classOf[ActorSystem])
+    override protected def actorSystem = app.injector.instanceOf(classOf[ActorSystem])
   }
 
   implicit val defaultTimeout: FiniteDuration = FiniteDuration(5, TimeUnit.SECONDS)

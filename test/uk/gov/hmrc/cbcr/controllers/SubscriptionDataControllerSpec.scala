@@ -22,28 +22,25 @@ import cats.data.OptionT
 import cats.instances.future._
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
-import org.scalatest.mock.MockitoSugar
-import org.scalatestplus.play.OneAppPerSuite
 import play.api.Configuration
 import play.api.http.Status
-import play.api.libs.json.{JsValue, Json}
 import play.api.libs.json.Json._
+import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.AnyContentAsEmpty
 import play.api.test.{FakeRequest, Helpers}
 import reactivemongo.api.commands.{DefaultWriteResult, WriteError, WriteResult}
-import uk.gov.hmrc.cbcr.config.CbcrIdConfig
+import uk.gov.hmrc.cbcr.WireMockResponses.AuthResponses
+import uk.gov.hmrc.cbcr.auth.CBCRAuth
 import uk.gov.hmrc.cbcr.connectors.DESConnector
 import uk.gov.hmrc.cbcr.models._
 import uk.gov.hmrc.cbcr.repositories.SubscriptionDataRepository
 import uk.gov.hmrc.cbcr.services.DataMigrationCriteria
+import uk.gov.hmrc.cbcr.testsupport.ItSpec
 import uk.gov.hmrc.emailaddress.EmailAddress
-import uk.gov.hmrc.http.HttpResponse
-import uk.gov.hmrc.play.test.UnitSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class SubscriptionDataControllerSpec extends UnitSpec with MockitoSugar with MockAuth with OneAppPerSuite{
+class SubscriptionDataControllerSpec extends ItSpec {
 
   val store = mock[SubscriptionDataRepository]
 
@@ -58,7 +55,8 @@ class SubscriptionDataControllerSpec extends UnitSpec with MockitoSugar with Moc
 
   val desConnector = mock[DESConnector]
   when(store.getSubscriptions(DataMigrationCriteria.LOCAL_CBCID_CRITERIA)) thenReturn Future.successful(List())
-  val controller = new SubscriptionDataController(store,desConnector,cBCRAuth)
+  val clientAuth = app.injector.instanceOf[CBCRAuth]
+  val controller = new SubscriptionDataController(store, desConnector, clientAuth, cc)
 
   val fakePostRequest: FakeRequest[JsValue] = FakeRequest(Helpers.POST, "/saveSubscriptionData").withBody(toJson(exampleSubscriptionData))
 
@@ -80,42 +78,49 @@ class SubscriptionDataControllerSpec extends UnitSpec with MockitoSugar with Moc
   val utr = Utr("7000000002")
 
 
-  "The SubscriptionDataController" should {
+  "The SubscriptionDataController" - {
     "respond with a 200 when asked to store SubscriptionData" in {
+      AuthResponses.authorisedResponse()
       when(store.save(any(classOf[SubscriptionDetails]))).thenReturn(Future.successful(okResult))
       val result = controller.saveSubscriptionData()(fakePostRequest)
       status(result) shouldBe Status.OK
     }
 
     "respond with a 500 if there is a DB failure during save" in {
+      AuthResponses.authorisedResponse()
       when(store.save(any(classOf[SubscriptionDetails]))).thenReturn(Future.successful(failResult))
       val result = controller.saveSubscriptionData()(fakePostRequest)
       status(result) shouldBe Status.INTERNAL_SERVER_ERROR
     }
 
     "respond with a 400 if invalid SubscriptionData passed in request" in {
+      AuthResponses.authorisedResponse()
       val result = controller.saveSubscriptionData()(BadFakePostRequest)
       status(result) shouldBe Status.BAD_REQUEST
     }
 
     "respond with a 200 when asked to update SubscriptionData" in {
+      AuthResponses.authorisedResponse()
       when(store.update(any(),any(classOf[SubscriberContact]))) thenReturn Future.successful(true)
       val result = controller.updateSubscriberContactDetails(cbcId)(fakePutRequest)
       status(result) shouldBe Status.OK
     }
 
     "respond with a 500 if there is a DB failure during update" in {
+      AuthResponses.authorisedResponse()
       when(store.update(any(),any(classOf[SubscriberContact]))) thenReturn Future.successful(false)
       val result = controller.updateSubscriberContactDetails(cbcId)(fakePutRequest)
       status(result) shouldBe Status.INTERNAL_SERVER_ERROR
     }
 
     "respond with a 400 if invalid SubscriberContact passed in request" in {
+      AuthResponses.authorisedResponse()
       val result = controller.updateSubscriberContactDetails(cbcId)(badFakePutRequest)
       status(result) shouldBe Status.BAD_REQUEST
     }
 
     "respond with a 200 and a SubscriptionData when asked to retrieve an existing CBCID" in {
+      AuthResponses.authorisedResponse()
       when(store.get(any(classOf[CBCId]))).thenReturn(OptionT.some[Future, SubscriptionDetails](exampleSubscriptionData))
       val result = controller.retrieveSubscriptionDataCBCId(cbcId)(fakeGetRequest)
       status(result) shouldBe Status.OK
@@ -123,18 +128,21 @@ class SubscriptionDataControllerSpec extends UnitSpec with MockitoSugar with Moc
     }
 
     "respond with a 404 when asked to retrieve a non-existent CBCID" in {
+      AuthResponses.authorisedResponse()
       when(store.get(any(classOf[CBCId]))).thenReturn(OptionT.none[Future, SubscriptionDetails])
       val result = controller.retrieveSubscriptionDataCBCId(cbcId)(fakeGetRequest)
       status(result) shouldBe Status.NOT_FOUND
     }
 
     "respond with a 200 when queried with a utr that already exists" in {
+      AuthResponses.authorisedResponse()
       when(store.get(any(classOf[Utr]))).thenReturn(OptionT.some[Future, SubscriptionDetails](exampleSubscriptionData))
       val result = controller.retrieveSubscriptionDataUtr(utr)(fakeGetRequest)
       status(result) shouldBe Status.OK
     }
 
     "respond with a 404 when queried with a utr that doesnt exist" in {
+      AuthResponses.authorisedResponse()
       when(store.get(any(classOf[Utr]))).thenReturn(OptionT.none[Future, SubscriptionDetails])
       val result = controller.retrieveSubscriptionDataUtr(utr)(fakeGetRequest)
       status(result) shouldBe Status.NOT_FOUND
@@ -142,18 +150,21 @@ class SubscriptionDataControllerSpec extends UnitSpec with MockitoSugar with Moc
     }
 
     "respond with a 200 when asked to clear a record that exists" in {
+      AuthResponses.authorisedResponse()
       when(store.clearCBCId(any(classOf[CBCId]))).thenReturn(OptionT.some[Future, WriteResult](okResult))
       val result = controller.clearSubscriptionData(cbcId)(fakeDeleteRequest)
       status(result) shouldBe Status.OK
     }
 
     "respond with a 404 when asked to clear a record that doesn't exist" in {
+      AuthResponses.authorisedResponse()
       when(store.clearCBCId(any(classOf[CBCId]))).thenReturn(OptionT.none[Future, WriteResult])
       val result = controller.clearSubscriptionData(cbcId)(fakeDeleteRequest)
       status(result) shouldBe Status.NOT_FOUND
     }
 
     "respond with a 500 when asked to clear a record but something goes wrong" in {
+      AuthResponses.authorisedResponse()
       when(store.clearCBCId(any(classOf[CBCId]))).thenReturn(OptionT.some[Future, WriteResult](failResult))
       val result = controller.clearSubscriptionData(cbcId)(fakeDeleteRequest)
       status(result) shouldBe Status.INTERNAL_SERVER_ERROR

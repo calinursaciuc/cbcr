@@ -29,9 +29,9 @@ trait CSRFTest {
     val csrfFilter = app.injector.instanceOf[CSRFFilter]
     val token = csrfFilter.tokenProvider.generateToken
 
-    fakeRequest.copyFakeRequest(tags = fakeRequest.tags ++ Map(
-      Token.NameRequestTag -> csrfConfig.tokenName,
-      Token.RequestTag -> token
-    )).withHeaders((csrfConfig.headerName, token))
+//    fakeRequest.attrs ++ Map(
+//      Token.Re -> csrfConfig.tokenName,
+//      Token.RequestTag -> token
+//    )).withHeaders((csrfConfig.headerName, token))
   }
 }

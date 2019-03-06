@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.cbcr.config
+package uk.gov.hmrc.cbcr.WireMockResponses
 
-import com.google.inject.Inject
-import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, post, stubFor, urlEqualTo, urlPathEqualTo}
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
 
-case class EmailConfig(baseUrl: String, emailAlertLogString: String) {
-  @Inject
-  def this(servicesConfig: ServicesConfig) = {
-    this(baseUrl = servicesConfig.baseUrl("email"),
-      emailAlertLogString = servicesConfig.getString("emailAlertLogString"))
+object EmailResponses {
+
+  def send(success: Boolean = true) : StubMapping = {
+    stubFor(
+      post(urlPathEqualTo("/hmrc/email/"))
+        .willReturn(
+          aResponse()
+            .withStatus(
+              202
+            )
+            .withBody("")
+        )
+    )
   }
 }

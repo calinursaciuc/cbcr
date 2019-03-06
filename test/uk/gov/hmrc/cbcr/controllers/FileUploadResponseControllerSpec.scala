@@ -20,26 +20,23 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.mock.MockitoSugar
 import play.api.http.Status
-import play.api.libs.json.{JsValue, Json}
 import play.api.libs.json.Json._
-import play.api.mvc.AnyContentAsEmpty
+import play.api.libs.json.{JsValue, Json}
+import play.api.mvc.{AnyContentAsEmpty, Result}
 import play.api.test.{FakeRequest, Helpers}
 import reactivemongo.api.commands.{DefaultWriteResult, WriteError}
+import uk.gov.hmrc.cbcr.WireMockResponses.AuthResponses
+import uk.gov.hmrc.cbcr.auth.CBCRAuth
 import uk.gov.hmrc.cbcr.models._
 import uk.gov.hmrc.cbcr.repositories.FileUploadRepository
-import uk.gov.hmrc.play.test.UnitSpec
+import uk.gov.hmrc.cbcr.testsupport.ItSpec
 
 import scala.concurrent.Future
 
-/**
-  * Created by max on 03/04/17.
-  */
-class FileUploadResponseControllerSpec extends UnitSpec with MockitoSugar with ScalaFutures with MockAuth{
+class FileUploadResponseControllerSpec extends ItSpec {
 
-  val fir = UploadFileResponse("id1", "fid1", "status",None)
+  val fir = UploadFileResponse("id1", "fid1", "status", None)
 
   val okResult = DefaultWriteResult(true, 0, Seq.empty, None, None, None)
 
@@ -55,29 +52,35 @@ class FileUploadResponseControllerSpec extends UnitSpec with MockitoSugar with S
   implicit val mat = ActorMaterializer()
 
   val repo = mock[FileUploadRepository]
+  lazy val clientAuth = app.injector.instanceOf[CBCRAuth]
 
-  val controller = new FileUploadResponseController(repo,cBCRAuth)
+  val uploadUrl = "http://localhost:19001/cbcr/file-upload-response"
 
-  "The FileUploadResponseController" should {
+  val controller = new FileUploadResponseController(repo, clientAuth, cc)
+
+  "The FileUploadResponseController" - {
     "respond with a 200 when asked to store an UploadFileResponse" in {
+      AuthResponses.authorisedResponse()
       when(repo.save(any(classOf[UploadFileResponse]))).thenReturn(Future.successful(okResult))
-      val result     = controller.saveFileUploadResponse(fakePostRequest)
-      status(result) shouldBe Status.OK
+      val result = httpClient.POST(uploadUrl, Json.toJson(fir)).futureValue
+      result.status shouldBe Status.OK
     }
 
     "respond with a 500 if there is a DB failure" in {
-      when(repo.save(any(classOf[UploadFileResponse]))).thenReturn(Future.successful(failResult))
+      when(repo.save(any(classOf[UploadFileResponse]))).thenReturn(Future.failed(new RuntimeException("")))
       val result = controller.saveFileUploadResponse(fakePostRequest)
       status(result) shouldBe Status.INTERNAL_SERVER_ERROR
     }
 
     "respond with a 400 if UploadFileResponse in request is invalid" in {
+      AuthResponses.authorisedResponse()
       when(repo.save(any(classOf[UploadFileResponse]))).thenReturn(Future.successful(failResult))
-      val result = controller.saveFileUploadResponse(badFakePostRequest)
-      status(result) shouldBe Status.BAD_REQUEST
+      val result = httpClient.POST(uploadUrl, Json.obj("bad" -> "request")).futureValue
+      result.status shouldBe Status.BAD_REQUEST
     }
 
     "respond with a 200 and a FileUploadResponse when asked to retrieve an existing envelopeId" in {
+      AuthResponses.authorisedResponse()
       when(repo.get(any(classOf[String]))).thenReturn(Future.successful(Some(fir)))
       val result = controller.retrieveFileUploadResponse("envelopeIdOk")(fakeGetRequest)
       status(result) shouldBe Status.OK
@@ -85,6 +88,7 @@ class FileUploadResponseControllerSpec extends UnitSpec with MockitoSugar with S
     }
 
     "respond with a 204 when asked to retrieve a non-existent envelopeId" in {
+      AuthResponses.authorisedResponse()
       when(repo.get(any(classOf[String]))).thenReturn(Future.successful(None))
       val result = controller.retrieveFileUploadResponse("envelopeIdFail")(fakeGetRequest)
       status(result) shouldBe Status.NO_CONTENT

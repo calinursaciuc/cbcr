@@ -24,11 +24,12 @@ import uk.gov.hmrc.auth.core.retrieve.AuthProvider.GovernmentGateway
 import uk.gov.hmrc.auth.core.retrieve.AuthProviders
 import uk.gov.hmrc.auth.core.retrieve.Retrievals.affinityGroup
 import uk.gov.hmrc.play.HeaderCarrierConverter
-import uk.gov.hmrc.play.bootstrap.controller.BaseController
+import uk.gov.hmrc.play.bootstrap.controller.BackendController
+
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class CBCRAuth @Inject()(val af: AuthorisedFunctions)(implicit val ec: ExecutionContext) extends BaseController {
+class CBCRAuth @Inject()(val af: AuthorisedFunctions, cc: ControllerComponents)(implicit val ec: ExecutionContext) extends BackendController(cc) {
   private val AuthProvider: AuthProviders = AuthProviders(GovernmentGateway)
   private type AuthAction[A] = Request[A] => Future[Result]
 

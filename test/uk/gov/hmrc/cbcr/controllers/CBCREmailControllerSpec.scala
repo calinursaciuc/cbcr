@@ -16,40 +16,40 @@
 
 package uk.gov.hmrc.cbcr.controllers
 
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.when
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.mock.MockitoSugar
+import play.api.http.Status
 import play.api.libs.json.Json
-import play.api.test.FakeRequest
+import play.api.mvc.ControllerComponents
+import uk.gov.hmrc.cbcr.WireMockResponses.{AuthResponses, EmailResponses}
+import uk.gov.hmrc.cbcr.auth.CBCRAuth
 import uk.gov.hmrc.cbcr.models._
 import uk.gov.hmrc.cbcr.services.EmailService
-import uk.gov.hmrc.play.test.UnitSpec
-import play.api.http.Status
+import uk.gov.hmrc.cbcr.testsupport.ItSpec
 
-import scala.concurrent.Future
-import play.api.mvc.Results.Accepted
+class CBCREmailControllerSpec extends ItSpec {
 
-class CBCREmailControllerSpec extends UnitSpec with MockitoSugar with ScalaFutures with MockAuth{
-
-  val paramsSub = Map("f_name" → "Tyrion","s_name" → "Lannister", "cbcrId" -> "XGCBC0000000001")
+  val paramsSub = Map("f_name" → "Tyrion", "s_name" → "Lannister", "cbcrId" -> "XGCBC0000000001")
   val correctEmail: Email = Email(List("tyrion.lannister@gmail.com"), "cbcr_subscription", paramsSub)
-  val mockEmailService = mock[EmailService]
-    val  cbcrEmailController = new CBCREmailController(mockEmailService,cBCRAuth)
+  val mockEmailService = app.injector.instanceOf[EmailService]
+  val clientAuth = app.injector.instanceOf[CBCRAuth]
+  val cc = mock[ControllerComponents]
+  val cbcrEmailController = new CBCREmailController(mockEmailService, clientAuth, cc)
 
-  "The CBCREmailController" should {
+  val emailUrl = s"http://localhost:19001/cbcr/email"
+  val emailJson = Email
+  "The CBCREmailController" - {
     "return a 202 for a valid rest call" in {
-      val fakeRequestSubscribe = FakeRequest("POST", "/email").withBody(Json.toJson(correctEmail))
-      when(mockEmailService.sendEmail(any())(any())) thenReturn Future.successful(Accepted)
-
-      val response = cbcrEmailController.sendEmail()(fakeRequestSubscribe)
-      status(response) shouldBe Status.ACCEPTED
+      AuthResponses.authorisedResponse()
+      EmailResponses.send(true)
+      val response = httpClient.POST(emailUrl, Json.toJson(correctEmail)).futureValue
+      response.status shouldBe Status.ACCEPTED
     }
     "return a 400 for a call with invalid email" in {
-      val fakeRequestSubscribe = FakeRequest("POST", "/email").withBody(Json.obj("bad" -> "request"))
+      AuthResponses.authorisedResponse()
+      EmailResponses.send(false)
 
-      val response = cbcrEmailController.sendEmail()(fakeRequestSubscribe)
-      status(response) shouldBe Status.BAD_REQUEST
+      val response = the[Exception] thrownBy (httpClient.POST(emailUrl, Json.obj("bad" -> "request")).futureValue)
+      response.getMessage should startWith("The future returned an exception of type: uk.gov.hmrc.http.BadRequestException, with message: POST of 'http://localhost:19001/cbcr/email' returned 400 (Bad Request)")
+
     }
   }
 }

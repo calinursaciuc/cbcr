@@ -23,6 +23,7 @@ import org.mockito.Mockito._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mock.MockitoSugar
 import play.api.http.Status
+import play.api.mvc.ControllerComponents
 import play.api.test.{FakeRequest, Helpers}
 import reactivemongo.api.commands.{DefaultWriteResult, WriteError}
 import uk.gov.hmrc.cbcr.models._
@@ -47,8 +48,8 @@ class MessageRefIdControllerSpec extends UnitSpec with MockitoSugar with ScalaFu
   implicit val mat = ActorMaterializer()
 
   val repo = mock[MessageRefIdRepository]
-
-  val controller = new MessageRefIdController(repo,cBCRAuth)
+  val cComp = mock[ControllerComponents]
+  val controller = new MessageRefIdController(repo,cBCRAuth, cComp)
 
   "The MessageRefIdController" should {
     "respond with a 200 when asked to save a MessageRefId" in {

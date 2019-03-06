@@ -19,9 +19,11 @@ package uk.gov.hmrc.cbcr
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.when
 import org.scalatest.mock.MockitoSugar
+import play.api.mvc.ControllerComponents
 import uk.gov.hmrc.auth.core.retrieve.Retrieval
 import uk.gov.hmrc.auth.core.{AffinityGroup, AuthConnector, AuthorisedFunctions}
 import uk.gov.hmrc.cbcr.auth.CBCRAuth
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -32,7 +34,8 @@ package object controllers extends MockitoSugar {
 
   val mockAuthConnector = mock[AuthConnector]
   lazy val af = mock[AuthorisedFunctions]
-  val cBCRAuth = new CBCRAuth(af)
+  val cc = mock[ ControllerComponents]
+  val cBCRAuth = new CBCRAuth(af, cc)
   val agentAffinity: Future[Option[AffinityGroup]] =
     Future successful Some(AffinityGroup.Agent)
 

@@ -27,6 +27,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mock.MockitoSugar
 import play.api.http.Status
 import play.api.libs.json.{JsValue, Json}
+import play.api.mvc.ControllerComponents
 import play.api.test.{FakeRequest, Helpers}
 import reactivemongo.api.commands.{DefaultWriteResult, WriteError}
 import uk.gov.hmrc.cbcr.models._
@@ -65,8 +66,7 @@ class ReportingEntityDataControllerSpec extends UnitSpec with MockitoSugar with 
   implicit val mat = ActorMaterializer()
 
   val repo = mock[ReportingEntityDataRepo]
-
-  val controller = new ReportingEntityDataController(repo,cBCRAuth)
+  val controller = new ReportingEntityDataController(repo,cBCRAuth, cc)
 
   "The MessageRefIdController" should {
     "respond with a 200 when asked to save a ReportingEntityData" in {
